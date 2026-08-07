@@ -1,0 +1,248 @@
+
+import sys, os
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.patches import Patch
+from matplotlib.path import Path
+from scipy.spatial import Delaunay
+from scipy.stats import mode
+sys.path.append("../../build/tools/pyMoDELib")
+import pyMoDELib
+sys.path.append("../../python")
+from modlibUtils import *
+
+plt.rcParams['text.usetex'] = False
+
+def normalize(v):
+    return np.array(v) / np.linalg.norm(v)
+
+def stereographic_projection(v):
+    v = normalize(v)
+    if v[2] < 0:
+        v = -v
+    return np.array([v[0] / (1 + v[2]), v[1] / (1 + v[2])])
+
+R = np.array([[0, 1], [-1, 0]])
+fig, ax = plt.subplots(figsize=(7, 7))
+
+def slerp(v0, v1, num_points=200):
+    v0 = normalize(v0)
+    v1 = normalize(v1)
+    dot = np.clip(np.dot(v0, v1), -1.0, 1.0)
+    theta = np.arccos(dot)
+    if np.isclose(theta, 0):
+        return np.tile(v0, (num_points, 1))
+    sin_theta = np.sin(theta)
+    return np.array([
+        (np.sin((1 - t) * theta) * v0 + np.sin(t * theta) * v1) / sin_theta
+        for t in np.linspace(0, 1, num_points)
+    ])
+
+# TOGGLES
+grouped_mode = True
+full_projection_mode = False
+
+# FOCUS AREA
+v1 = normalize([-1, -1, 2])
+v2 = normalize([1, 1, 1])
+v3 = normalize([-2, 1, 1])
+
+arc12 = slerp(v1, v2)
+arc23 = slerp(v2, v3)
+arc31 = slerp(v3, v1)
+
+proj_arc12 = np.array([stereographic_projection(p) for p in arc12]) @ R.T
+proj_arc23 = np.array([stereographic_projection(p) for p in arc23]) @ R.T
+proj_arc31 = np.array([stereographic_projection(p) for p in arc31]) @ R.T
+
+curved_triangle_path_pts = np.vstack([proj_arc12, proj_arc23, proj_arc31])
+triangle_path = Path(curved_triangle_path_pts)
+
+# SLIP SYSTEMS
+selected_indices = [5, 2, 10, 14, 22, 13, 21, 16, 8, 6, 0, 18]
+slip_systems_full = [
+    ([1, 1, -1], [1, 0, 1]), ([-1, -1, 1], [1, 0, 1]),
+    ([-1, 1, 1], [1, 0, 1]), ([1, -1, -1], [1, 0, 1]),
+    ([-1, -1, -1], [-1, 0, 1]), ([1, 1, 1], [-1, 0, 1]),
+    ([1, -1, 1], [-1, 0, 1]), ([-1, 1, -1], [-1, 0, 1]),
+    ([1, -1, 1], [0, 1, 1]), ([-1, 1, -1], [0, 1, 1]),
+    ([1, 1, -1], [0, 1, 1]), ([-1, -1, 1], [0, 1, 1]),
+    ([-1, -1, -1], [0, 1, -1]), ([1, 1, 1], [0, 1, -1]),
+    ([-1, 1, 1], [0, 1, -1]), ([1, -1, -1], [0, 1, -1]),
+    ([-1, 1, 1], [1, 1, 0]), ([1, -1, -1], [1, 1, 0]),
+    ([1, -1, 1], [1, 1, 0]), ([-1, 1, -1], [1, 1, 0]),
+    ([-1, -1, -1], [1, -1, 0]), ([1, 1, 1], [1, -1, 0]),
+    ([1, 1, -1], [1, -1, 0]), ([-1, -1, 1], [1, -1, 0])
+]
+if grouped_mode:
+    slip_systems = [slip_systems_full[i] for i in selected_indices]
+    group_map = np.arange(12)
+else:
+    slip_systems = slip_systems_full
+
+slip_systems = [(normalize(np.array(b)), normalize(np.array(n))) for b, n in slip_systems]
+
+n_points = 200000
+indices = np.arange(0, n_points, dtype=float) + 0.5
+phi = np.arccos(1 - 2*indices/n_points)
+theta = np.pi * (1 + 5**0.5) * indices
+x, y, z = np.sin(phi) * np.cos(theta), np.sin(phi) * np.sin(theta), np.cos(phi)
+orientations = np.stack((x, y, z), axis=1)
+
+projected_points = np.array([stereographic_projection(v) for v in orientations])
+projected_points = projected_points @ R.T
+
+# MoDELib
+materialFile = "../../Library/Materials/W.txt"
+T = 300
+s0 = 0.01
+mat = pyMoDELib.PolycrystallineMaterialBase(materialFile, T)
+mob = pyMoDELib.DislocationMobilityBCC(mat)
+
+max_slip_indices = []
+for m in orientations:
+    m = normalize(m)
+    S = np.outer(m, m) * s0
+    v_all = [mob.velocity(S, b, b, n, T) for b, n in slip_systems]
+    max_slip_indices.append(np.argmax(v_all))
+max_slip_indices = np.array(max_slip_indices)
+
+raw_indices = max_slip_indices
+grouped_indices = group_map[raw_indices] if grouped_mode else raw_indices
+
+if grouped_mode:
+    colors = [
+        "#f5a400", "#802080", "#888888", "#0000ff",
+        "#ff69b4", "#808000", "#00e5ff", "#ff0000",
+        "#66f0e3", "#a0522d", "#000000", "#ffff00"
+    ]
+    cmap = ListedColormap(colors)
+    labels = [
+        '[111](1̄01)', '[1̄11](101)', '[111̄](011)', '[1̄11](011̄)',
+        '[111̄](11̄0)', '[111](011̄)', '[111](11̄0)', '[1̄11](110)',
+        '[11̄1](011)', '[11̄1](1̄01)', '[111̄](101)', '[11̄1](110)'
+    ]
+else:
+    labels = [f'SS {i+1}' for i in range(len(slip_systems))]
+    tab24 = [
+        '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231', '#911eb4',
+        '#46f0f0', '#f032e6', '#bcf60c', '#fabebe', '#008080', '#e6beff',
+        '#9a6324', '#fffac8', '#800000', '#aaffc3', '#808000', '#ffd8b1',
+        '#000075', '#808080', '#ffffff', '#000000', '#d2691e', '#00ffff'
+    ]
+    cmap = ListedColormap(tab24)
+
+indices = grouped_indices
+tri = Delaunay(projected_points)
+all_facecolors = mode(indices[tri.simplices], axis=1).mode.flatten()
+centroids = projected_points[tri.simplices].mean(axis=1)  # shape: (n_tri, 2)
+
+mask = triangle_path.contains_points(centroids)
+
+if full_projection_mode:
+    simplices = tri.simplices
+    face_alpha = np.ones_like(all_facecolors, dtype=float)
+else:
+    simplices = tri.simplices
+    face_alpha = np.full_like(all_facecolors, 0.0, dtype=float)  # dim everything
+    face_alpha[mask] = 1.0  # full opacity inside triangle
+
+colors_to_plot = all_facecolors
+
+tpc = ax.tripcolor(
+    projected_points[:, 0], projected_points[:, 1], simplices,
+    facecolors=colors_to_plot,
+    cmap=cmap,
+    edgecolors='none',
+    shading='flat',
+    alpha=face_alpha
+)
+
+if not full_projection_mode:
+    ax.plot(proj_arc12[:, 0], proj_arc12[:, 1], 'k-', lw=2)
+    ax.plot(proj_arc23[:, 0], proj_arc23[:, 1], 'k-', lw=2)
+    ax.plot(proj_arc31[:, 0], proj_arc31[:, 1], 'k-', lw=2)
+
+
+ax.set_aspect('equal')
+ax.axis('off')
+ax.set_title("Max-Velocity Slip System", fontsize=12)
+patches = [Patch(color=cmap(i), label=labels[i]) for i in range(len(labels))]
+ax.legend(handles=patches, loc='center left', bbox_to_anchor=(1.22, 0.5), frameon=False)
+
+special_dirs = {
+    '[001]': normalize([0, 0, 1]),
+    '[011]': normalize([0, 1, 1]),
+    '[1̄11]': normalize([-1, 1, 1]),
+    '[1̄01]': normalize([-1, 0, 1]),
+    '[1̄1̄2]': normalize([-1, -1, 2]),
+    '[111]': normalize([1, 1, 1]),
+    '[2̄11]': normalize([-2, 1, 1])
+}
+
+extra_dirs = {
+    '[100]': normalize([1, 0, 0]),
+    '[010]': normalize([0, 1, 0]),
+    '[001]': normalize([0, 0, 1]),
+    '[1̄00]': normalize([-1, 0, 0]),
+    '[01̄0]': normalize([0, -1, 0]),
+    '[001̄]': normalize([0, 0, -1]),
+    '[110]': normalize([1, 1, 0]),
+    '[101]': normalize([1, 0, 1]),
+    '[011]': normalize([0, 1, 1]),
+    '[1̄10]': normalize([-1, 1, 0]),
+    '[1̄01]': normalize([-1, 0, 1]),
+    '[1̄1̄1]': normalize([-1, -1, 1]),
+    '[1̄1̄0]': normalize([-1, -1, 0]),
+    '[01̄1]': normalize([0, -1, 1]),
+    '[11̄0]': normalize([1, -1, 0]),
+    '[10̄1]': normalize([1, 0, -1]),
+    '[111]': normalize([1, 1, 1]),
+    '[1̄11]': normalize([-1, 1, 1]),
+    '[11̄1]': normalize([1, -1, 1]),
+    '[111̄]': normalize([1, 1, -1]),
+}
+
+proj_pts = {k: stereographic_projection(v) @ R.T for k, v in special_dirs.items()}
+
+pairs = [('[001]', '[011]'), ('[011]', '[1̄11]'), ('[1̄11]', '[001]'),
+         ('[1̄01]', '[001]'), ('[1̄01]', '[1̄11]'),
+         ('[2̄11]', '[1̄1̄2]'), ('[2̄11]', '[111]'), ('[1̄1̄2]', '[111]')]
+
+if not full_projection_mode:
+    for label, pt in proj_pts.items():
+        ax.plot(pt[0], pt[1], 'ko', zorder=5)
+        ax.text(pt[0] + 0.02, pt[1] + 0.02, label, fontsize=9, weight='bold', zorder=6)
+
+    for a, b in pairs:
+        arc = slerp(special_dirs[a], special_dirs[b])
+        arc_proj = np.array([stereographic_projection(v) @ R.T for v in arc])
+        ax.plot(arc_proj[:, 0], arc_proj[:, 1], 'k-', lw=1.5, zorder=4)
+
+extra_pairs = [
+    ('[100]', '[110]'), ('[110]', '[010]'), ('[010]', '[1̄10]'),
+    ('[1̄10]', '[1̄00]'), ('[1̄00]', '[1̄1̄0]'), ('[1̄1̄0]', '[01̄0]'),
+    ('[01̄0]', '[11̄0]'),('[11̄0]', '[100]'),
+    ('[100]', '[001]'), ('[1̄00]', '[001]'),
+    ('[010]', '[001]'), ('[01̄0]', '[001]'),
+    ('[11̄0]', '[001]'), ('[1̄1̄0]', '[001]'), ('[1̄10]', '[001]'), ('[110]', '[001]'),
+    ('[01̄0]', '[1̄01]'), ('[01̄0]', '[101]'), ('[1̄01]', '[010]'),
+    ('[101]', '[010]'), ('[1̄11]', '[001]'),('[1̄00]','[01̄1]'),('[1̄00]','[011]'),('[100]','[01̄1]'),('[100]','[011]')
+]
+
+if full_projection_mode:
+    for label, v in extra_dirs.items():
+        pt = stereographic_projection(v) @ R.T
+        ax.plot(pt[0], pt[1], 'rs', markersize=5, zorder=5)  # red square
+        ax.text(pt[0] + 0.02, pt[1] + 0.02, label, fontsize=8, zorder=6)
+
+    for a, b in extra_pairs:
+        arc = slerp(extra_dirs[a], extra_dirs[b])
+        arc_proj = np.array([stereographic_projection(v) @ R.T for v in arc])
+        ax.plot(arc_proj[:, 0], arc_proj[:, 1], 'k-', lw=1.5, zorder=4)
+
+
+plt.tight_layout()
+plt.show()
+# plt.savefig("/mnt/data/StereoVelocityMap_FullToggle.py.png", dpi=300)

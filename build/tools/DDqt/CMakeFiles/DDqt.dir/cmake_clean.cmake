@@ -1,0 +1,42 @@
+file(REMOVE_RECURSE
+  "CMakeFiles/DDqt_autogen.dir/AutogenUsed.txt"
+  "CMakeFiles/DDqt_autogen.dir/ParseCache.txt"
+  "DDqt_autogen"
+  "CMakeFiles/DDqt.dir/DDqt.cxx.o"
+  "CMakeFiles/DDqt.dir/DDqt.cxx.o.d"
+  "CMakeFiles/DDqt.dir/DDqt_autogen/mocs_compilation.cpp.o"
+  "CMakeFiles/DDqt.dir/DDqt_autogen/mocs_compilation.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/ChartActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/ChartActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/DDFieldWidget.cpp.o"
+  "CMakeFiles/DDqt.dir/src/DDFieldWidget.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/DDqtMainWindow.cpp.o"
+  "CMakeFiles/DDqt.dir/src/DDqtMainWindow.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/DDqtVTKwidget.cpp.o"
+  "CMakeFiles/DDqt.dir/src/DDqtVTKwidget.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/DefectiveCrystalActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/DefectiveCrystalActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/GlidePlaneActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/GlidePlaneActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/InclusionActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/InclusionActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/NetworkLinkActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/NetworkLinkActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/NetworkLoopActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/NetworkLoopActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/NetworkNodeActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/NetworkNodeActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/QuadratureActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/QuadratureActor.cpp.o.d"
+  "CMakeFiles/DDqt.dir/src/SimplicialMeshActor.cpp.o"
+  "CMakeFiles/DDqt.dir/src/SimplicialMeshActor.cpp.o.d"
+  "DDqt"
+  "DDqt.pdb"
+  "DDqt_autogen/mocs_compilation.cpp"
+  "DDqt_autogen/timestamp"
+)
+
+# Per-language clean rules from dependency scanning.
+foreach(lang CXX)
+  include(CMakeFiles/DDqt.dir/cmake_clean_${lang}.cmake OPTIONAL)
+endforeach()

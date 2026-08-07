@@ -1,0 +1,8 @@
+type=FrankLoops;
+style=individual;
+planeIDs=0;
+loopRadii_SI=330.0e-10; [m] loop radii
+loopSides =14; [-] number of side of loop polygon
+loopCenters=0 0 0;
+isVacancyLoop=1; # 1=vacancy-type loops, 0=interstiatial-type loops
+
